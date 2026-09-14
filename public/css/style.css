@@ -290,3 +290,41 @@ select:focus, input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px #00
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* --- Settings / upgrades --- */
+.btn.neon-orange { box-shadow: 0 0 0 1px #ffaa0044, 0 0 28px #ffaa0022; }
+.checkbox-field {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+}
+.checkbox-field input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--cyan);
+  cursor: pointer;
+}
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--cyan);
+  cursor: pointer;
+}
+.neon-val {
+  color: var(--cyan);
+  font-family: var(--display);
+  font-weight: 700;
+  margin-left: 0.35rem;
+}
+#app {
+  max-width: min(1100px, 100%);
+}
+.game-hud {
+  width: min(100%, 1280px);
+}
+.weapon-btn {
+  font-size: 0.62rem;
+  padding: 0.35rem 0.5rem;
+}
+#hud-move {
+  font-size: 0.85rem;
+}
