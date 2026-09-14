@@ -1,5 +1,5 @@
-const DEFAULT_WIDTH = 960;
-const DEFAULT_HEIGHT = 540;
+const DEFAULT_WIDTH = 1200;
+const DEFAULT_HEIGHT = 675;
 const TANK_RADIUS = 14;
 const GRAVITY = 0.18;
 const MAX_POWER = 100;
@@ -111,10 +111,18 @@ function moveTank(state, tankId, dx) {
   nx = Math.max(TANK_RADIUS + 8, Math.min(state.width - TANK_RADIUS - 8, nx));
   tank.x = nx; settleTank(state.terrain, tank); return { ok: true };
 }
-function createProjectile(tank, weaponKey) {
+// Bomb speed setting 1/2/3 → velocity multipliers 0.75x / 1.0x / 1.5x (1=slowest, 3=fastest).
+function bombSpeedScale(level) {
+  const n = Math.max(1, Math.min(3, Math.round(Number(level) || 2)));
+  if (n === 1) return 0.75;
+  if (n === 3) return 1.5;
+  return 1.0;
+}
+
+function createProjectile(tank, weaponKey, bombSpeed) {
   const key = weaponKey || tank.weapon;
   const w = WEAPONS[key] || WEAPONS.missile;
-  const power = (tank.power / MAX_POWER) * 14 + 2;
+  const power = ((tank.power / MAX_POWER) * 14 + 2) * bombSpeedScale(bombSpeed);
   return {
     x: tank.x + Math.cos(tank.angle) * (TANK_RADIUS + 6), y: tank.y + Math.sin(tank.angle) * (TANK_RADIUS + 6),
     vx: Math.cos(tank.angle) * power, vy: Math.sin(tank.angle) * power, weapon: key, ownerId: tank.id,
@@ -217,9 +225,11 @@ function createMatch({ seed, players, roomId, options }) {
   const windEnabled = opts.windEnabled !== false;
   const maxWind = opts.maxWind != null ? Number(opts.maxWind) : 10;
   const moveDistance = opts.moveDistance != null ? Number(opts.moveDistance) : 50;
+  const bombSpeed = opts.bombSpeed != null ? Math.max(1, Math.min(3, Math.round(Number(opts.bombSpeed) || 2))) : 2;
   return {
     roomId, seed, terrain, tanks, currentTurn: 0, phase: 'aiming',
     wind: rollWind({ windEnabled, maxWind }), windEnabled, maxWind, moveDistance,
+    bombSpeed,
     projectile: null, projectiles: [], particles: [], shake: 0, tick: 0, width, height,
   };
 }
@@ -243,7 +253,7 @@ function publicState(state) {
       color: t.color, weapon: t.weapon, name: t.name, isAI: t.isAI, turnOriginX: t.turnOriginX,
     })),
     currentTurn: state.currentTurn, phase: state.phase, wind: state.wind, windEnabled: state.windEnabled,
-    maxWind: state.maxWind, moveDistance: state.moveDistance, projectile: projectiles[0] || null, projectiles,
+    maxWind: state.maxWind, moveDistance: state.moveDistance, bombSpeed: state.bombSpeed != null ? state.bombSpeed : 2, projectile: projectiles[0] || null, projectiles,
     shake: state.shake, tick: state.tick, winnerId: state.winnerId ?? null, width: state.width, height: state.height,
   };
 }
@@ -253,7 +263,7 @@ function fire(state, tankId, { angle, power, weapon }) {
   if (!tank || !tank.alive || state.currentTurn !== tankId) return { ok: false, error: 'Not your turn' };
   tank.angle = angle; tank.power = Math.max(5, Math.min(MAX_POWER, power));
   tank.weapon = WEAPONS[weapon] ? weapon : 'missile';
-  const proj = createProjectile(tank, tank.weapon);
+  const proj = createProjectile(tank, tank.weapon, state.bombSpeed);
   state.projectiles = [proj]; state.projectile = proj; state.phase = 'flying';
   return { ok: true };
 }
@@ -290,6 +300,7 @@ function simulateFlight(state, maxSteps = 600) {
 module.exports = {
   WIDTH: DEFAULT_WIDTH, HEIGHT: DEFAULT_HEIGHT, DEFAULT_WIDTH, DEFAULT_HEIGHT, WEAPONS, COLORS,
   generateTerrain, terrainY, deformTerrain, placeTanks, createMatch, publicState, fire, simulateFlight,
-  createProjectile, stepProjectile, applyImpact, nextTurn, settleTank, livingTanks, moveTank, rollWind,
+  createProjectile,
+  bombSpeedScale, stepProjectile, applyImpact, nextTurn, settleTank, livingTanks, moveTank, rollWind,
   beginTurnMove, GRAVITY, MAX_POWER, TANK_RADIUS,
 };
