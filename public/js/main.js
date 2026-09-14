@@ -47,6 +47,8 @@
     if (move) move.value = String(s.moveDistance);
     const moveLabel = document.getElementById('set-move-distance-val');
     if (moveLabel) moveLabel.textContent = String(s.moveDistance);
+    const bombSpeed = document.getElementById('set-bomb-speed');
+    if (bombSpeed) bombSpeed.value = String(s.bombSpeed != null ? s.bombSpeed : 2);
   }
 
   function openSettings(from) {
@@ -54,6 +56,7 @@
     settingsFromGame = from === 'game';
     populateSettingsForm();
     if (settingsFromGame) {
+      // keep canvas visible behind; show settings as overlay panel
       Object.entries(screens).forEach(([k, el]) => {
         if (el) el.classList.toggle('hidden', k !== 'settings');
       });
@@ -63,18 +66,21 @@
   }
 
   function applySettingsFromForm() {
-    const resolution = document.getElementById('set-resolution')?.value || '960x540';
+    const resolution = document.getElementById('set-resolution')?.value || '1200x675';
     const windEnabled = !!document.getElementById('set-wind-enabled')?.checked;
     const maxWind = Number(document.getElementById('set-max-wind')?.value) || 0;
     const moveDistance = Number(document.getElementById('set-move-distance')?.value) || 0;
-    Settings.set({ resolution, windEnabled, maxWind, moveDistance });
+    const bombSpeed = Math.max(1, Math.min(3, Math.round(Number(document.getElementById('set-bomb-speed')?.value) || 2)));
+    Settings.set({ resolution, windEnabled, maxWind, moveDistance, bombSpeed });
     Settings.applyCanvas(canvas);
     Settings.fitCanvasDisplay(canvas);
+    // Live-update SP match options if mid-aiming (wind/move for next turn / remaining)
     const st = Game.getState && Game.getState();
     if (st && Game.getMode() === 'playing' && st.phase === 'aiming') {
       st.windEnabled = windEnabled;
       st.maxWind = maxWind;
       st.moveDistance = moveDistance;
+      st.bombSpeed = bombSpeed;
       if (!windEnabled) st.wind = 0;
       else if (Math.abs(st.wind) > maxWind) {
         st.wind = Math.sign(st.wind) * maxWind || 0;
@@ -101,6 +107,7 @@
   Settings.applyCanvas(canvas);
   Settings.fitCanvasDisplay(canvas);
 
+  // Landing buttons
   document.getElementById('btn-sp').addEventListener('click', () => showScreen('sp'));
   document.getElementById('btn-local').addEventListener('click', () => showScreen('local'));
   document.getElementById('btn-settings').addEventListener('click', () => openSettings('landing'));
@@ -145,12 +152,14 @@
     if (el) el.textContent = e.target.value;
   });
 
+  // Single player start
   document.getElementById('btn-start-sp').addEventListener('click', () => {
     const total = Number(document.getElementById('sp-total').value) || 2;
     document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden'));
     Game.startLocal({ total, humans: 1, names: ['You'] });
   });
 
+  // Local multiplayer
   document.getElementById('btn-start-local').addEventListener('click', () => {
     const humans = Number(document.getElementById('local-humans').value) || 2;
     document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden'));
@@ -159,6 +168,7 @@
     Game.startLocal({ total: humans, humans, names });
   });
 
+  // Weapons
   document.querySelectorAll('.weapon-btn').forEach((btn) => {
     btn.addEventListener('click', () => Game.setWeapon(btn.dataset.weapon));
   });
@@ -177,6 +187,7 @@
     window.dispatchEvent(ev);
   });
 
+  // Lobby UI
   document.getElementById('btn-set-nick')?.addEventListener('click', () => {
     Lobby.setNick(document.getElementById('nick-input').value);
   });
