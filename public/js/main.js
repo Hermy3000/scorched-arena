@@ -5,7 +5,11 @@
     sp: document.getElementById('screen-sp'),
     local: document.getElementById('screen-local'),
     lobby: document.getElementById('screen-lobby'),
+    settings: document.getElementById('screen-settings'),
   };
+
+  let settingsReturnScreen = 'landing';
+  let settingsFromGame = false;
 
   function showScreen(name) {
     Object.entries(screens).forEach(([k, el]) => {
@@ -17,14 +21,89 @@
 
   function goMenu() {
     Game.stop();
+    settingsFromGame = false;
     showScreen('landing');
   }
 
-  Game.init(canvas, goMenu);
+  function populateSettingsForm() {
+    const s = Settings.get();
+    const resSel = document.getElementById('set-resolution');
+    if (resSel && !resSel.options.length) {
+      Settings.RESOLUTIONS.forEach((r) => {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = r.label;
+        resSel.appendChild(opt);
+      });
+    }
+    if (resSel) resSel.value = s.resolution;
+    const windOn = document.getElementById('set-wind-enabled');
+    if (windOn) windOn.checked = !!s.windEnabled;
+    const maxWind = document.getElementById('set-max-wind');
+    if (maxWind) maxWind.value = String(s.maxWind);
+    const maxWindLabel = document.getElementById('set-max-wind-val');
+    if (maxWindLabel) maxWindLabel.textContent = String(s.maxWind);
+    const move = document.getElementById('set-move-distance');
+    if (move) move.value = String(s.moveDistance);
+    const moveLabel = document.getElementById('set-move-distance-val');
+    if (moveLabel) moveLabel.textContent = String(s.moveDistance);
+  }
 
-  // Landing buttons
+  function openSettings(from) {
+    settingsReturnScreen = from || 'landing';
+    settingsFromGame = from === 'game';
+    populateSettingsForm();
+    if (settingsFromGame) {
+      Object.entries(screens).forEach(([k, el]) => {
+        if (el) el.classList.toggle('hidden', k !== 'settings');
+      });
+    } else {
+      showScreen('settings');
+    }
+  }
+
+  function applySettingsFromForm() {
+    const resolution = document.getElementById('set-resolution')?.value || '960x540';
+    const windEnabled = !!document.getElementById('set-wind-enabled')?.checked;
+    const maxWind = Number(document.getElementById('set-max-wind')?.value) || 0;
+    const moveDistance = Number(document.getElementById('set-move-distance')?.value) || 0;
+    Settings.set({ resolution, windEnabled, maxWind, moveDistance });
+    Settings.applyCanvas(canvas);
+    Settings.fitCanvasDisplay(canvas);
+    const st = Game.getState && Game.getState();
+    if (st && Game.getMode() === 'playing' && st.phase === 'aiming') {
+      st.windEnabled = windEnabled;
+      st.maxWind = maxWind;
+      st.moveDistance = moveDistance;
+      if (!windEnabled) st.wind = 0;
+      else if (Math.abs(st.wind) > maxWind) {
+        st.wind = Math.sign(st.wind) * maxWind || 0;
+      }
+    }
+  }
+
+  function closeSettings(save) {
+    if (save) applySettingsFromForm();
+    else populateSettingsForm();
+    if (settingsFromGame && (Game.getMode() === 'playing' || Game.getMode() === 'online')) {
+      Object.entries(screens).forEach(([, el]) => {
+        if (el) el.classList.add('hidden');
+      });
+      document.getElementById('canvas-wrap')?.classList.remove('hidden');
+      document.getElementById('game-overlay')?.classList.remove('hidden');
+      settingsFromGame = false;
+      return;
+    }
+    showScreen(settingsReturnScreen || 'landing');
+  }
+
+  Game.init(canvas, goMenu);
+  Settings.applyCanvas(canvas);
+  Settings.fitCanvasDisplay(canvas);
+
   document.getElementById('btn-sp').addEventListener('click', () => showScreen('sp'));
   document.getElementById('btn-local').addEventListener('click', () => showScreen('local'));
+  document.getElementById('btn-settings').addEventListener('click', () => openSettings('landing'));
   document.getElementById('btn-online').addEventListener('click', () => {
     showScreen('lobby');
     Lobby.connect({
@@ -45,18 +124,33 @@
         Lobby.leaveRoom();
         return;
       }
+      if (btn.dataset.back === 'settings-close') {
+        closeSettings(false);
+        return;
+      }
       showScreen(btn.dataset.back || 'landing');
     });
   });
 
-  // Single player start
+  document.getElementById('btn-save-settings')?.addEventListener('click', () => {
+    closeSettings(true);
+  });
+
+  document.getElementById('set-max-wind')?.addEventListener('input', (e) => {
+    const el = document.getElementById('set-max-wind-val');
+    if (el) el.textContent = e.target.value;
+  });
+  document.getElementById('set-move-distance')?.addEventListener('input', (e) => {
+    const el = document.getElementById('set-move-distance-val');
+    if (el) el.textContent = e.target.value;
+  });
+
   document.getElementById('btn-start-sp').addEventListener('click', () => {
     const total = Number(document.getElementById('sp-total').value) || 2;
     document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden'));
     Game.startLocal({ total, humans: 1, names: ['You'] });
   });
 
-  // Local multiplayer
   document.getElementById('btn-start-local').addEventListener('click', () => {
     const humans = Number(document.getElementById('local-humans').value) || 2;
     document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden'));
@@ -65,7 +159,6 @@
     Game.startLocal({ total: humans, humans, names });
   });
 
-  // Weapons
   document.querySelectorAll('.weapon-btn').forEach((btn) => {
     btn.addEventListener('click', () => Game.setWeapon(btn.dataset.weapon));
   });
@@ -75,12 +168,15 @@
     goMenu();
   });
 
+  document.getElementById('btn-settings-game')?.addEventListener('click', () => {
+    openSettings('game');
+  });
+
   document.getElementById('btn-fire')?.addEventListener('click', () => {
     const ev = new KeyboardEvent('keydown', { code: 'Space' });
     window.dispatchEvent(ev);
   });
 
-  // Lobby UI
   document.getElementById('btn-set-nick')?.addEventListener('click', () => {
     Lobby.setNick(document.getElementById('nick-input').value);
   });
@@ -120,14 +216,8 @@
     }
   });
 
-  // Fit canvas
   function fit() {
-    const wrap = document.getElementById('canvas-wrap');
-    if (!wrap) return;
-    const maxW = Math.min(window.innerWidth - 24, 960);
-    const scale = maxW / 960;
-    canvas.style.width = `${960 * scale}px`;
-    canvas.style.height = `${540 * scale}px`;
+    Settings.fitCanvasDisplay(canvas);
   }
   window.addEventListener('resize', fit);
   fit();
