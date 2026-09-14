@@ -235,7 +235,7 @@ select:focus, input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px #00
   height: auto;
 }
 .game-hud {
-  width: min(960px, 100%);
+  width: min(1200px, 100%);
   display: flex;
   justify-content: space-between;
   align-items: center;
