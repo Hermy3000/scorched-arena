@@ -28,36 +28,23 @@ function roomListPublic() {
   return Array.from(rooms.values())
     .filter((r) => r.status === 'lobby')
     .map((r) => ({
-      id: r.id,
-      name: r.name,
-      seats: r.seats,
-      players: r.players.length,
+      id: r.id, name: r.name, seats: r.seats, players: r.players.length,
       host: r.players[0]?.nickname || '?',
     }));
 }
 
-function broadcastLobby() {
-  io.emit('lobby:rooms', roomListPublic());
-}
+function broadcastLobby() { io.emit('lobby:rooms', roomListPublic()); }
 
 function roomPublic(room) {
   return {
-    id: room.id,
-    name: room.name,
-    seats: room.seats,
-    status: room.status,
+    id: room.id, name: room.name, seats: room.seats, status: room.status,
     players: room.players.map((p) => ({
-      socketId: p.socketId,
-      nickname: p.nickname,
-      ready: p.ready,
-      seat: p.seat,
+      socketId: p.socketId, nickname: p.nickname, ready: p.ready, seat: p.seat,
     })),
   };
 }
 
-function emitRoom(room) {
-  io.to(room.id).emit('room:update', roomPublic(room));
-}
+function emitRoom(room) { io.to(room.id).emit('room:update', roomPublic(room)); }
 
 function getRoomForSocket(socket) {
   const info = players.get(socket.id);
@@ -65,9 +52,20 @@ function getRoomForSocket(socket) {
   return rooms.get(info.roomId) || null;
 }
 
+function clampMatchOptions(raw) {
+  const o = raw && typeof raw === 'object' ? raw : {};
+  const width = Math.max(640, Math.min(2560, Number(o.width) || 960));
+  const height = Math.max(480, Math.min(1440, Number(o.height) || 540));
+  return {
+    width, height,
+    windEnabled: o.windEnabled !== false && o.windEnabled !== 0,
+    maxWind: Math.max(0, Math.min(30, Number(o.maxWind != null ? o.maxWind : 10))),
+    moveDistance: Math.max(0, Math.min(200, Number(o.moveDistance != null ? o.moveDistance : 50))),
+  };
+}
+
 io.on('connection', (socket) => {
   players.set(socket.id, { nickname: 'Guest', roomId: null });
-
   socket.emit('lobby:rooms', roomListPublic());
 
   socket.on('lobby:nick', (nick) => {
@@ -79,8 +77,7 @@ io.on('connection', (socket) => {
     if (room) {
       const p = room.players.find((x) => x.socketId === socket.id);
       if (p) p.nickname = n;
-      emitRoom(room);
-      broadcastLobby();
+      emitRoom(room); broadcastLobby();
     }
   });
 
@@ -88,75 +85,34 @@ io.on('connection', (socket) => {
     const info = players.get(socket.id);
     const text = String(msg || '').trim().slice(0, 200);
     if (!text) return;
-    io.emit('lobby:chat', {
-      from: info?.nickname || 'Guest',
-      text,
-      ts: Date.now(),
-    });
+    io.emit('lobby:chat', { from: info?.nickname || 'Guest', text, ts: Date.now() });
   });
 
   socket.on('room:create', ({ name, seats }) => {
     const info = players.get(socket.id);
-    if (info?.roomId) {
-      socket.emit('errorMsg', 'Leave your current room first');
-      return;
-    }
+    if (info?.roomId) { socket.emit('errorMsg', 'Leave your current room first'); return; }
     const seatCount = Math.max(2, Math.min(4, Number(seats) || 2));
     const id = makeRoomId();
     const room = {
-      id,
-      name: String(name || `${info.nickname}'s Arena`).trim().slice(0, 24),
-      seats: seatCount,
-      status: 'lobby',
-      players: [
-        {
-          socketId: socket.id,
-          nickname: info.nickname,
-          ready: false,
-          seat: 0,
-        },
-      ],
-      match: null,
-      simTimer: null,
+      id, name: String(name || `${info.nickname}'s Arena`).trim().slice(0, 24),
+      seats: seatCount, status: 'lobby',
+      players: [{ socketId: socket.id, nickname: info.nickname, ready: false, seat: 0 }],
+      match: null, simTimer: null,
     };
-    rooms.set(id, room);
-    info.roomId = id;
-    socket.join(id);
-    emitRoom(room);
-    broadcastLobby();
-    socket.emit('room:joined', roomPublic(room));
+    rooms.set(id, room); info.roomId = id; socket.join(id);
+    emitRoom(room); broadcastLobby(); socket.emit('room:joined', roomPublic(room));
   });
 
   socket.on('room:join', (roomId) => {
     const info = players.get(socket.id);
-    if (info?.roomId) {
-      socket.emit('errorMsg', 'Already in a room');
-      return;
-    }
+    if (info?.roomId) { socket.emit('errorMsg', 'Already in a room'); return; }
     const room = rooms.get(String(roomId || '').toUpperCase());
-    if (!room) {
-      socket.emit('errorMsg', 'Room not found');
-      return;
-    }
-    if (room.status !== 'lobby') {
-      socket.emit('errorMsg', 'Game already started');
-      return;
-    }
-    if (room.players.length >= room.seats) {
-      socket.emit('errorMsg', 'Room full');
-      return;
-    }
-    room.players.push({
-      socketId: socket.id,
-      nickname: info.nickname,
-      ready: false,
-      seat: room.players.length,
-    });
-    info.roomId = room.id;
-    socket.join(room.id);
-    emitRoom(room);
-    broadcastLobby();
-    socket.emit('room:joined', roomPublic(room));
+    if (!room) { socket.emit('errorMsg', 'Room not found'); return; }
+    if (room.status !== 'lobby') { socket.emit('errorMsg', 'Game already started'); return; }
+    if (room.players.length >= room.seats) { socket.emit('errorMsg', 'Room full'); return; }
+    room.players.push({ socketId: socket.id, nickname: info.nickname, ready: false, seat: room.players.length });
+    info.roomId = room.id; socket.join(room.id);
+    emitRoom(room); broadcastLobby(); socket.emit('room:joined', roomPublic(room));
   });
 
   socket.on('room:leave', () => leaveRoom(socket));
@@ -166,11 +122,7 @@ io.on('connection', (socket) => {
     const info = players.get(socket.id);
     const text = String(msg || '').trim().slice(0, 200);
     if (!room || !text) return;
-    io.to(room.id).emit('room:chat', {
-      from: info?.nickname || 'Guest',
-      text,
-      ts: Date.now(),
-    });
+    io.to(room.id).emit('room:chat', { from: info?.nickname || 'Guest', text, ts: Date.now() });
   });
 
   socket.on('room:ready', (ready) => {
@@ -178,27 +130,17 @@ io.on('connection', (socket) => {
     if (!room || room.status !== 'lobby') return;
     const p = room.players.find((x) => x.socketId === socket.id);
     if (!p) return;
-    p.ready = !!ready;
-    emitRoom(room);
+    p.ready = !!ready; emitRoom(room);
   });
 
-  socket.on('room:start', () => {
+  socket.on('room:start', (payload) => {
     const room = getRoomForSocket(socket);
     if (!room || room.status !== 'lobby') return;
-    if (room.players[0]?.socketId !== socket.id) {
-      socket.emit('errorMsg', 'Only host can start');
-      return;
-    }
-    if (room.players.length < 2) {
-      socket.emit('errorMsg', 'Need at least 2 players');
-      return;
-    }
-    const allReady = room.players.every((p) => p.ready);
-    if (!allReady) {
-      socket.emit('errorMsg', 'All players must be ready');
-      return;
-    }
-    startMatch(room);
+    if (room.players[0]?.socketId !== socket.id) { socket.emit('errorMsg', 'Only host can start'); return; }
+    if (room.players.length < 2) { socket.emit('errorMsg', 'Need at least 2 players'); return; }
+    if (!room.players.every((p) => p.ready)) { socket.emit('errorMsg', 'All players must be ready'); return; }
+    const options = clampMatchOptions(payload && payload.settings ? payload.settings : payload);
+    startMatch(room, options);
   });
 
   socket.on('game:aim', ({ angle, power, weapon }) => {
@@ -213,28 +155,31 @@ io.on('connection', (socket) => {
     io.to(room.id).emit('game:state', game.publicState(room.match));
   });
 
+  socket.on('game:move', ({ dx }) => {
+    const room = getRoomForSocket(socket);
+    if (!room?.match || room.status !== 'playing') return;
+    const tank = room.match.tanks.find((t) => t.socketId === socket.id);
+    if (!tank) return;
+    const result = game.moveTank(room.match, tank.id, Number(dx) || 0);
+    if (!result.ok) {
+      if (result.error && result.error !== 'Movement disabled') socket.emit('errorMsg', result.error);
+      return;
+    }
+    io.to(room.id).emit('game:state', game.publicState(room.match));
+  });
+
   socket.on('game:fire', ({ angle, power, weapon }) => {
     const room = getRoomForSocket(socket);
     if (!room?.match || room.status !== 'playing') return;
     const tank = room.match.tanks.find((t) => t.socketId === socket.id);
     if (!tank) return;
-    const result = game.fire(room.match, tank.id, {
-      angle: Number(angle),
-      power: Number(power),
-      weapon,
-    });
-    if (!result.ok) {
-      socket.emit('errorMsg', result.error);
-      return;
-    }
+    const result = game.fire(room.match, tank.id, { angle: Number(angle), power: Number(power), weapon });
+    if (!result.ok) { socket.emit('errorMsg', result.error); return; }
     io.to(room.id).emit('game:state', game.publicState(room.match));
     runSimulation(room);
   });
 
-  socket.on('disconnect', () => {
-    leaveRoom(socket);
-    players.delete(socket.id);
-  });
+  socket.on('disconnect', () => { leaveRoom(socket); players.delete(socket.id); });
 });
 
 function leaveRoom(socket) {
@@ -242,47 +187,28 @@ function leaveRoom(socket) {
   if (!info?.roomId) return;
   const roomId = info.roomId;
   const room = rooms.get(roomId);
-  info.roomId = null;
-  socket.leave(roomId);
+  info.roomId = null; socket.leave(roomId);
   if (!room) return;
   room.players = room.players.filter((p) => p.socketId !== socket.id);
-  if (room.simTimer) {
-    clearInterval(room.simTimer);
-    room.simTimer = null;
-  }
-  if (room.players.length === 0) {
-    rooms.delete(room.id);
-  } else {
-    room.players.forEach((p, i) => {
-      p.seat = i;
-    });
-    if (room.status === 'playing') {
-      // mark tank as AI / dead leave
-      if (room.match) {
-        const t = room.match.tanks.find((x) => x.socketId === socket.id);
-        if (t) {
-          t.socketId = null;
-          t.isAI = true;
-          t.name = (t.name || 'Player') + ' (left)';
-        }
-      }
+  if (room.simTimer) { clearInterval(room.simTimer); room.simTimer = null; }
+  if (room.players.length === 0) rooms.delete(room.id);
+  else {
+    room.players.forEach((p, i) => { p.seat = i; });
+    if (room.status === 'playing' && room.match) {
+      const t = room.match.tanks.find((x) => x.socketId === socket.id);
+      if (t) { t.socketId = null; t.isAI = true; t.name = (t.name || 'Player') + ' (left)'; }
     }
     emitRoom(room);
   }
   broadcastLobby();
 }
 
-function startMatch(room) {
+function startMatch(room, options) {
   room.status = 'playing';
   const seed = Date.now() & 0xffffffff;
   room.match = game.createMatch({
-    seed,
-    roomId: room.id,
-    players: room.players.map((p) => ({
-      nickname: p.nickname,
-      socketId: p.socketId,
-      isAI: false,
-    })),
+    seed, roomId: room.id, options: options || {},
+    players: room.players.map((p) => ({ nickname: p.nickname, socketId: p.socketId, isAI: false })),
   });
   emitRoom(room);
   const pub = game.publicState(room.match);
@@ -297,20 +223,14 @@ function runSimulation(room) {
   if (room.simTimer) clearInterval(room.simTimer);
   room.simTimer = setInterval(() => {
     if (!room.match || room.match.phase !== 'flying') {
-      clearInterval(room.simTimer);
-      room.simTimer = null;
+      clearInterval(room.simTimer); room.simTimer = null;
       io.to(room.id).emit('game:state', game.publicState(room.match));
       if (room.match?.phase === 'ended') {
-        io.to(room.id).emit('game:ended', {
-          winnerId: room.match.winnerId,
-          state: game.publicState(room.match),
-        });
-        // reset to lobby after brief moment handled client-side; keep status
+        io.to(room.id).emit('game:ended', { winnerId: room.match.winnerId, state: game.publicState(room.match) });
         room.status = 'ended';
       }
       return;
     }
-    // step a few physics frames per tick for snappy feel
     for (let s = 0; s < 3; s++) {
       if (room.match.phase !== 'flying') break;
       game.simulateFlight(room.match, 1);
@@ -324,10 +244,7 @@ function listen(port, attemptsLeft) {
     if (err.code === 'EADDRINUSE' && attemptsLeft > 0) {
       console.log(`Port ${port} in use, trying ${port + 1}...`);
       listen(port + 1, attemptsLeft - 1);
-    } else {
-      console.error(err);
-      process.exit(1);
-    }
+    } else { console.error(err); process.exit(1); }
   });
   server.listen(port, '0.0.0.0', () => {
     const addr = server.address();
