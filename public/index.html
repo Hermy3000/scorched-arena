@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scorched Arena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="bg-stars"></div>
+  <div id="app">
+    <header class="topbar">
+      <div class="logo">SCORCHED <span>ARENA</span></div>
+      <div id="net-status" class="muted"></div>
+    </header>
+
+    <!-- Landing -->
+    <section id="screen-landing" class="screen panel">
+      <h1>Artillery Warfare</h1>
+      <p class="tagline">Neon tanks. Destructible hills. Turn-based mayhem.</p>
+      <div class="menu-grid">
+        <button id="btn-sp" class="btn big neon-cyan">Single Player</button>
+        <button id="btn-local" class="btn big neon-pink">Local Multiplayer</button>
+        <button id="btn-online" class="btn big neon-lime">Online Lobby</button>
+      </div>
+      <p class="hint">←→ aim · ↑↓ power · 1/2/3 weapons · Space fire</p>
+    </section>
+
+    <!-- Single player setup -->
+    <section id="screen-sp" class="screen panel hidden">
+      <h2>Single Player</h2>
+      <p>You vs AI bots. Choose total tanks on the field.</p>
+      <label class="field">
+        Total tanks (2–4)
+        <select id="sp-total">
+          <option value="2" selected>2 — You vs 1 AI</option>
+          <option value="3">3 — You vs 2 AI</option>
+          <option value="4">4 — You vs 3 AI</option>
+        </select>
+      </label>
+      <div class="row">
+        <button class="btn" data-back="landing">Back</button>
+        <button id="btn-start-sp" class="btn primary">Start Battle</button>
+      </div>
+    </section>
+
+    <!-- Local multiplayer -->
+    <section id="screen-local" class="screen panel hidden">
+      <h2>Local Multiplayer</h2>
+      <p>Hotseat — pass the keyboard between turns.</p>
+      <label class="field">
+        Humans
+        <select id="local-humans">
+          <option value="2" selected>2 Players</option>
+          <option value="3">3 Players</option>
+          <option value="4">4 Players</option>
+        </select>
+      </label>
+      <div class="row">
+        <button class="btn" data-back="landing">Back</button>
+        <button id="btn-start-local" class="btn primary">Start Battle</button>
+      </div>
+    </section>
+
+    <!-- Online lobby -->
+    <section id="screen-lobby" class="screen panel wide hidden">
+      <h2>Online Lobby</h2>
+      <div class="row nick-row">
+        <input id="nick-input" maxlength="16" placeholder="Nickname" />
+        <button id="btn-set-nick" class="btn small">Set</button>
+        <button class="btn small ghost" data-back="landing">Back</button>
+      </div>
+
+      <div id="lobby-browse" class="lobby-grid">
+        <div class="card">
+          <h3>Create Room</h3>
+          <input id="room-name" maxlength="24" placeholder="Room name" />
+          <label class="field">
+            Seats
+            <select id="room-seats">
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </label>
+          <button id="btn-create-room" class="btn primary">Create</button>
+        </div>
+        <div class="card">
+          <h3>Open Rooms</h3>
+          <div id="room-list" class="room-list"></div>
+        </div>
+        <div class="card chat-card">
+          <h3>Global Chat</h3>
+          <div id="global-chat" class="chat-box"></div>
+          <form id="global-chat-form" class="chat-form">
+            <input id="global-chat-input" maxlength="200" placeholder="Say hello…" autocomplete="off" />
+            <button class="btn small" type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="lobby-room" class="hidden">
+        <h3 id="room-title">Room</h3>
+        <div id="room-detail" class="seat-list"></div>
+        <div class="row">
+          <button id="btn-ready" class="btn">Ready</button>
+          <button id="btn-start-room" class="btn primary hidden">Start Match</button>
+          <button class="btn ghost" data-back="lobby-leave">Leave</button>
+        </div>
+        <div class="card chat-card" style="margin-top:1rem">
+          <h3>Room Chat</h3>
+          <div id="room-chat" class="chat-box"></div>
+          <form id="room-chat-form" class="chat-form">
+            <input id="room-chat-input" maxlength="200" placeholder="Team talk…" autocomplete="off" />
+            <button class="btn small" type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Game canvas -->
+    <div id="canvas-wrap" class="hidden">
+      <div id="game-overlay" class="game-hud hidden">
+        <div class="hud-left">
+          <span id="hud-turn"></span>
+          <span id="hud-wind" class="muted"></span>
+        </div>
+        <div class="hud-weapons">
+          <button class="weapon-btn active" data-weapon="missile" title="1">Missile</button>
+          <button class="weapon-btn" data-weapon="nuke" title="2">Nuke</button>
+          <button class="weapon-btn" data-weapon="dirt" title="3">Dirt</button>
+          <button id="btn-fire" class="btn small primary">FIRE</button>
+          <button id="btn-menu-game" class="btn small ghost">Menu</button>
+        </div>
+      </div>
+      <canvas id="game" width="960" height="540"></canvas>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/physics.js"></script>
+  <script src="/js/render.js"></script>
+  <script src="/js/game.js"></script>
+  <script src="/js/lobby.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>
