@@ -103,7 +103,7 @@ window.Game = (function () {
     if (mode === 'online' && onlineSocket) {
       onlineSocket.emit('game:fire', { angle: tank.angle, power: tank.power, weapon: tank.weapon }); return;
     }
-    const proj = Physics.createProjectile(tank);
+    const proj = Physics.createProjectile(tank, tank.weapon, state.bombSpeed);
     state.projectiles = [proj]; state.projectile = proj; state.phase = 'flying';
   }
 
@@ -117,7 +117,7 @@ window.Game = (function () {
       Physics.aiDecide(state, tank); updateWeaponUI();
       setTimeout(() => {
         if (!state || state.phase !== 'aiming') return;
-        const proj = Physics.createProjectile(tank);
+        const proj = Physics.createProjectile(tank, tank.weapon, state.bombSpeed);
         state.projectiles = [proj]; state.projectile = proj; state.phase = 'flying';
       }, 400);
     }, 700 + Math.random() * 600);
