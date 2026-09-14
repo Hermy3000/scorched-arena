@@ -55,6 +55,15 @@
         <input type="range" id="set-move-distance" min="0" max="200" step="5" value="50" />
       </label>
 
+      <label class="field">
+        Bomb speed (1 slowest – 3 fastest)
+        <select id="set-bomb-speed">
+          <option value="1">1 – Slow</option>
+          <option value="2" selected>2 – Normal</option>
+          <option value="3">3 – Fast</option>
+        </select>
+      </label>
+
       <div class="row">
         <button class="btn" data-back="settings-close">Cancel</button>
         <button id="btn-save-settings" class="btn primary">Save</button>
@@ -175,7 +184,7 @@
           <button id="btn-menu-game" class="btn small ghost">Menu</button>
         </div>
       </div>
-      <canvas id="game" width="960" height="540"></canvas>
+      <canvas id="game" width="1200" height="675"></canvas>
     </div>
   </div>
 
