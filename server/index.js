@@ -54,13 +54,14 @@ function getRoomForSocket(socket) {
 
 function clampMatchOptions(raw) {
   const o = raw && typeof raw === 'object' ? raw : {};
-  const width = Math.max(640, Math.min(2560, Number(o.width) || 960));
-  const height = Math.max(480, Math.min(1440, Number(o.height) || 540));
+  const width = Math.max(640, Math.min(2560, Number(o.width) || 1200));
+  const height = Math.max(480, Math.min(1440, Number(o.height) || 675));
   return {
     width, height,
     windEnabled: o.windEnabled !== false && o.windEnabled !== 0,
     maxWind: Math.max(0, Math.min(30, Number(o.maxWind != null ? o.maxWind : 10))),
     moveDistance: Math.max(0, Math.min(200, Number(o.moveDistance != null ? o.moveDistance : 50))),
+    bombSpeed: Math.max(1, Math.min(3, Math.round(Number(o.bombSpeed != null ? o.bombSpeed : 2) || 2))),
   };
 }
 
