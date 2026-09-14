@@ -1,25 +1,28 @@
 /**
- * Persistent gameplay settings (resolution, wind, pre-shot move).
+ * Persistent gameplay settings (resolution, wind, pre-shot move, bomb speed).
  */
 window.Settings = (function () {
   const STORAGE_KEY = 'sa_settings';
 
   const RESOLUTIONS = [
-    { id: '800x600', w: 800, h: 600, label: '800×600' },
-    { id: '960x540', w: 960, h: 540, label: '960×540 (default)' },
-    { id: '1024x768', w: 1024, h: 768, label: '1024×768' },
-    { id: '1280x720', w: 1280, h: 720, label: '1280×720' },
-    { id: '1600x900', w: 1600, h: 900, label: '1600×900' },
-    { id: '1920x1080', w: 1920, h: 1080, label: '1920×1080' },
-    { id: '1920x800', w: 1920, h: 800, label: '1920×800 ultrawide' },
-    { id: '2560x1080', w: 2560, h: 1080, label: '2560×1080 ultrawide' },
+    { id: '800x600', w: 800, h: 600, label: '800x600' },
+    { id: '960x540', w: 960, h: 540, label: '960x540' },
+    { id: '1200x675', w: 1200, h: 675, label: '1200x675 (default)' },
+    { id: '1024x768', w: 1024, h: 768, label: '1024x768' },
+    { id: '1280x720', w: 1280, h: 720, label: '1280x720' },
+    { id: '1600x900', w: 1600, h: 900, label: '1600x900' },
+    { id: '1920x1080', w: 1920, h: 1080, label: '1920x1080' },
+    { id: '1920x800', w: 1920, h: 800, label: '1920x800 ultrawide' },
+    { id: '2560x1080', w: 2560, h: 1080, label: '2560x1080 ultrawide' },
   ];
 
   const DEFAULTS = {
-    resolution: '960x540',
+    resolution: '1200x675',
     windEnabled: true,
     maxWind: 10,
     moveDistance: 50,
+    // 1=slowest, 2=normal, 3=fastest (see Physics.bombSpeedScale)
+    bombSpeed: 2,
   };
 
   let current = { ...DEFAULTS };
@@ -45,6 +48,7 @@ window.Settings = (function () {
     current.windEnabled = !!current.windEnabled;
     current.maxWind = Math.max(0, Math.min(30, Number(current.maxWind) || 0));
     current.moveDistance = Math.max(0, Math.min(200, Number(current.moveDistance) || 0));
+    current.bombSpeed = Math.max(1, Math.min(3, Math.round(Number(current.bombSpeed) || 2)));
   }
 
   function save() {
@@ -63,7 +67,11 @@ window.Settings = (function () {
   }
 
   function getResolution() {
-    return RESOLUTIONS.find((r) => r.id === current.resolution) || RESOLUTIONS[1];
+    return (
+      RESOLUTIONS.find((r) => r.id === current.resolution) ||
+      RESOLUTIONS.find((r) => r.id === DEFAULTS.resolution) ||
+      RESOLUTIONS[0]
+    );
   }
 
   function getSize() {
@@ -80,6 +88,7 @@ window.Settings = (function () {
       windEnabled: current.windEnabled,
       maxWind: current.maxWind,
       moveDistance: current.moveDistance,
+      bombSpeed: current.bombSpeed,
     };
   }
 
