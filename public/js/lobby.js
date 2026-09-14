@@ -96,7 +96,8 @@ window.Lobby = (function () {
   }
 
   function startGame() {
-    if (socket) socket.emit('room:start');
+    const settings = window.Settings ? Settings.matchOptions() : {};
+    if (socket) socket.emit('room:start', { settings });
   }
 
   function renderRooms(list) {
