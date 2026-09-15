@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Scorched Arena</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -27,7 +27,7 @@
         <button id="btn-online" class="btn big neon-lime">Online Lobby</button>
         <button id="btn-settings" class="btn big neon-orange">Settings</button>
       </div>
-      <p class="hint">←→ aim · ↑↓ power · Q/E move · 1–8 weapons · Space fire</p>
+      <p class="hint">Touch: on-screen pad + weapons + FIRE · or ←→ aim · ↑↓ power · Q/E move · 1–8 · Space fire</p>
     </section>
 
     <!-- Settings -->
@@ -91,7 +91,7 @@
     <!-- Local multiplayer -->
     <section id="screen-local" class="screen panel hidden">
       <h2>Local Multiplayer</h2>
-      <p>Hotseat — pass the keyboard between turns.</p>
+      <p>Hotseat — pass the device between turns (touch pad or keyboard).</p>
       <label class="field">
         Humans
         <select id="local-humans">
@@ -171,17 +171,35 @@
           <span id="hud-move" class="muted"></span>
         </div>
         <div class="hud-weapons">
-          <button class="weapon-btn active" data-weapon="missile" title="1">Missile</button>
-          <button class="weapon-btn" data-weapon="nuke" title="2">Nuke</button>
-          <button class="weapon-btn" data-weapon="dirt" title="3">Dirt</button>
-          <button class="weapon-btn" data-weapon="bounce" title="4">Bounce</button>
-          <button class="weapon-btn" data-weapon="digger" title="5">Digger</button>
-          <button class="weapon-btn" data-weapon="napalm" title="6">Napalm</button>
-          <button class="weapon-btn" data-weapon="mirv" title="7">MIRV</button>
-          <button class="weapon-btn" data-weapon="megadirt" title="8">MegaDirt</button>
-          <button id="btn-fire" class="btn small primary">FIRE</button>
-          <button id="btn-settings-game" class="btn small ghost">Settings</button>
-          <button id="btn-menu-game" class="btn small ghost">Menu</button>
+          <button type="button" class="weapon-btn active" data-weapon="missile" title="1">Missile</button>
+          <button type="button" class="weapon-btn" data-weapon="nuke" title="2">Nuke</button>
+          <button type="button" class="weapon-btn" data-weapon="dirt" title="3">Dirt</button>
+          <button type="button" class="weapon-btn" data-weapon="bounce" title="4">Bounce</button>
+          <button type="button" class="weapon-btn" data-weapon="digger" title="5">Digger</button>
+          <button type="button" class="weapon-btn" data-weapon="napalm" title="6">Napalm</button>
+          <button type="button" class="weapon-btn" data-weapon="mirv" title="7">MIRV</button>
+          <button type="button" class="weapon-btn" data-weapon="megadirt" title="8">MegaDirt</button>
+          <button type="button" id="btn-fire" class="btn primary btn-fire-touch">FIRE</button>
+          <button type="button" id="btn-settings-game" class="btn small ghost touch-menu-btn">Settings</button>
+          <button type="button" id="btn-menu-game" class="btn small ghost touch-menu-btn">Menu</button>
+        </div>
+        <div id="touch-pad" class="touch-pad" aria-label="Touch controls">
+          <div class="touch-group" data-group="aim">
+            <span class="touch-label">Aim</span>
+            <button type="button" class="touch-btn" data-hold="aimLeft" aria-label="Aim left">Aim −</button>
+            <button type="button" class="touch-btn" data-hold="aimRight" aria-label="Aim right">Aim +</button>
+          </div>
+          <div class="touch-group" data-group="power">
+            <span class="touch-label">Power</span>
+            <button type="button" class="touch-btn" data-hold="powerDown" aria-label="Power down">Pow −</button>
+            <button type="button" class="touch-btn" data-hold="powerUp" aria-label="Power up">Pow +</button>
+          </div>
+          <div class="touch-group" data-group="move" id="touch-move-group">
+            <span class="touch-label">Move</span>
+            <button type="button" class="touch-btn" data-hold="moveLeft" aria-label="Move left">← Move</button>
+            <button type="button" class="touch-btn" data-hold="moveRight" aria-label="Move right">Move →</button>
+          </div>
+          <p class="touch-hint muted">Hold pads to adjust · drag on arena to aim · FIRE when ready</p>
         </div>
       </div>
       <canvas id="game" width="1200" height="675"></canvas>
@@ -190,7 +208,7 @@
 
   <div id="toast"></div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <script src="/js/settings.js"></script>
   <script src="/js/physics.js"></script>
   <script src="/js/render.js"></script>
