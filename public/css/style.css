@@ -328,3 +328,159 @@ input[type="range"] {
 #hud-move {
   font-size: 0.85rem;
 }
+
+
+/* --- Tablet / touch play --- */
+#canvas-wrap.playing,
+#canvas-wrap:not(.hidden) {
+  touch-action: manipulation;
+}
+#game {
+  touch-action: none;
+  -ms-touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.game-hud {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.btn-fire-touch {
+  min-height: 48px;
+  min-width: 88px;
+  padding: 0.75rem 1.35rem !important;
+  font-size: 1.05rem !important;
+  letter-spacing: 0.12em;
+  box-shadow: 0 0 22px #00f5ff55;
+}
+.touch-menu-btn {
+  min-height: 44px;
+  min-width: 72px;
+  padding: 0.55rem 0.85rem !important;
+}
+.weapon-btn {
+  min-height: 44px;
+  min-width: 64px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.72rem;
+  touch-action: manipulation;
+}
+.touch-pad {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+  align-items: flex-end;
+  justify-content: flex-start;
+  margin-top: 0.15rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid #ffffff12;
+}
+.touch-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.35rem 0.45rem;
+  background: #050a1488;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.touch-group.disabled {
+  opacity: 0.38;
+  filter: grayscale(0.4);
+  pointer-events: none;
+}
+.touch-label {
+  font-family: var(--display);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: var(--cyan);
+  width: 100%;
+  margin-bottom: 0.1rem;
+}
+.touch-btn {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  min-height: 48px;
+  min-width: 72px;
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #1a2448, #101830);
+  color: var(--text);
+  cursor: pointer;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.touch-btn.held,
+.touch-btn:active {
+  border-color: var(--cyan);
+  background: linear-gradient(180deg, #0a6a78, #084858);
+  box-shadow: 0 0 18px #00f5ff55;
+  color: #fff;
+}
+.touch-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.touch-hint {
+  flex: 1 1 100%;
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+@media (max-width: 900px) {
+  #app { padding: 0.75rem 0.6rem 2rem; }
+  .game-hud {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+  }
+  .hud-weapons {
+    justify-content: center;
+  }
+  .weapon-btn {
+    flex: 1 1 calc(25% - 0.4rem);
+    max-width: calc(25% - 0.3rem);
+  }
+  .btn-fire-touch {
+    flex: 1 1 100%;
+    max-width: none;
+    width: 100%;
+  }
+  .touch-pad {
+    justify-content: stretch;
+  }
+  .touch-group {
+    flex: 1 1 calc(50% - 0.5rem);
+    justify-content: center;
+  }
+  .touch-btn {
+    flex: 1 1 40%;
+  }
+}
+
+@media (max-width: 560px) {
+  .weapon-btn {
+    flex: 1 1 calc(33.33% - 0.4rem);
+    max-width: none;
+    font-size: 0.68rem;
+  }
+  .touch-group {
+    flex: 1 1 100%;
+  }
+  .touch-hint { font-size: 0.75rem; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .game-hud { padding: 0.4rem 0.6rem; }
+  .touch-btn { min-height: 44px; padding: 0.45rem 0.7rem; }
+  .btn-fire-touch { min-height: 44px; padding: 0.55rem 1rem !important; }
+  .touch-hint { display: none; }
+}
