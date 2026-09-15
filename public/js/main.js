@@ -182,9 +182,9 @@
     openSettings('game');
   });
 
-  document.getElementById('btn-fire')?.addEventListener('click', () => {
-    const ev = new KeyboardEvent('keydown', { code: 'Space' });
-    window.dispatchEvent(ev);
+  document.getElementById('btn-fire')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    Game.fire();
   });
 
   // Lobby UI
