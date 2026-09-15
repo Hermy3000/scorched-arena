@@ -45,7 +45,9 @@ Online: the **host’s** settings are applied when they start the match (resolut
 | Space | Fire |
 | Esc | Return to menu |
 
-Touch/mouse: use on-screen weapon + FIRE / Settings buttons.
+### Tablet / touch
+
+During play the HUD shows a **touch pad** (Aim −/+, Power −/+, Move ←/→). Hold a button for continuous adjust (same rates as keyboard). Tap weapons, **FIRE**, **Settings**, or **Menu**. Drag on the arena to aim the barrel toward the touch point. Move pads grey out when pre-shot move is 0. Keyboard still works on desktop.
 
 ## Weapons
 
