@@ -3,12 +3,22 @@ window.Game = (function () {
   let state = null;
   let raf = null;
   let keys = {};
-  let mode = 'menu';
+  let mode = 'menu'; // menu | playing | online
   let onExit = null;
   let onlineSocket = null;
   let myTankId = null;
   let aiTimer = null;
   let moveAccum = 0;
+  const holds = {
+    aimLeft: false,
+    aimRight: false,
+    powerUp: false,
+    powerDown: false,
+    moveLeft: false,
+    moveRight: false,
+  };
+  let canvasDragAim = false;
+  let touchBound = false;
 
   function init(c, exitCb) {
     canvas = c;
@@ -16,12 +26,118 @@ window.Game = (function () {
     onExit = exitCb;
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    bindTouchControls();
+    bindCanvasAim();
+  }
+
+  function setHold(name, on) {
+    if (Object.prototype.hasOwnProperty.call(holds, name)) {
+      holds[name] = !!on;
+    }
+  }
+
+  function clearHolds() {
+    Object.keys(holds).forEach((k) => { holds[k] = false; });
+    canvasDragAim = false;
+  }
+
+  function bindTouchControls() {
+    if (touchBound) return;
+    touchBound = true;
+    const pad = document.getElementById('touch-pad');
+    if (!pad) return;
+
+    const startHold = (btn, e) => {
+      if (!btn || !btn.dataset.hold) return;
+      e.preventDefault();
+      setHold(btn.dataset.hold, true);
+      btn.classList.add('held');
+    };
+    const endHold = (btn) => {
+      if (!btn || !btn.dataset.hold) return;
+      setHold(btn.dataset.hold, false);
+      btn.classList.remove('held');
+    };
+
+    pad.querySelectorAll('[data-hold]').forEach((btn) => {
+      btn.addEventListener('pointerdown', (e) => {
+        try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+        startHold(btn, e);
+      });
+      btn.addEventListener('pointerup', () => endHold(btn));
+      btn.addEventListener('pointercancel', () => endHold(btn));
+      btn.addEventListener('pointerleave', (e) => {
+        if (e.buttons === 0) endHold(btn);
+      });
+      btn.addEventListener('lostpointercapture', () => endHold(btn));
+      btn.addEventListener('contextmenu', (e) => e.preventDefault());
+    });
+  }
+
+  function canvasPointerPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
+  }
+
+  function aimTowardPoint(x, y) {
+    const tank = currentControllable();
+    if (!tank || !state || state.phase !== 'aiming') return;
+    tank.angle = Math.atan2(y - tank.y, x - tank.x);
+    if (mode === 'online' && onlineSocket) {
+      onlineSocket.emit('game:aim', {
+        angle: tank.angle,
+        power: tank.power,
+        weapon: tank.weapon,
+      });
+    }
+    updateWeaponUI();
+  }
+
+  function bindCanvasAim() {
+    if (!canvas || canvas.dataset.aimBound === '1') return;
+    canvas.dataset.aimBound = '1';
+    canvas.style.touchAction = 'none';
+
+    const onDown = (e) => {
+      if (mode !== 'playing' && mode !== 'online') return;
+      if (!currentControllable() || !state || state.phase !== 'aiming') return;
+      if (e.isPrimary === false) return;
+      canvasDragAim = true;
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+      const p = canvasPointerPos(e);
+      aimTowardPoint(p.x, p.y);
+    };
+    const onMove = (e) => {
+      if (!canvasDragAim) return;
+      e.preventDefault();
+      const p = canvasPointerPos(e);
+      aimTowardPoint(p.x, p.y);
+    };
+    const onUp = () => { canvasDragAim = false; };
+
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onUp);
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   function weaponFromDigit(code) {
     const map = {
-      Digit1: 'missile', Digit2: 'nuke', Digit3: 'dirt', Digit4: 'bounce',
-      Digit5: 'digger', Digit6: 'napalm', Digit7: 'mirv', Digit8: 'megadirt',
+      Digit1: 'missile',
+      Digit2: 'nuke',
+      Digit3: 'dirt',
+      Digit4: 'bounce',
+      Digit5: 'digger',
+      Digit6: 'napalm',
+      Digit7: 'mirv',
+      Digit8: 'megadirt',
     };
     return map[code] || null;
   }
@@ -29,25 +145,42 @@ window.Game = (function () {
   function onKeyDown(e) {
     keys[e.code] = true;
     if (mode !== 'playing' && mode !== 'online') return;
-    if (e.code === 'Escape') { e.preventDefault(); stop(); if (onExit) onExit(); return; }
+    if (e.code === 'Escape') {
+      e.preventDefault();
+      stop();
+      if (onExit) onExit();
+      return;
+    }
     if (state && state.phase === 'ended') return;
     const tank = currentControllable();
     if (!tank || (state && state.phase !== 'aiming')) return;
+
     const wpn = weaponFromDigit(e.code);
     if (wpn && Physics.WEAPONS[wpn]) {
-      tank.weapon = wpn; updateWeaponUI();
-      if (mode === 'online' && onlineSocket) onlineSocket.emit('game:aim', { angle: tank.angle, power: tank.power, weapon: tank.weapon });
+      tank.weapon = wpn;
+      updateWeaponUI();
+      if (mode === 'online' && onlineSocket) {
+        onlineSocket.emit('game:aim', { angle: tank.angle, power: tank.power, weapon: tank.weapon });
+      }
     }
-    if (e.code === 'Space') { e.preventDefault(); fire(); }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      fire();
+    }
   }
 
-  function onKeyUp(e) { keys[e.code] = false; }
+  function onKeyUp(e) {
+    keys[e.code] = false;
+  }
 
   function currentControllable() {
     if (!state) return null;
     const tank = state.tanks[state.currentTurn];
     if (!tank || !tank.alive) return null;
-    if (mode === 'online') { if (tank.id !== myTankId) return null; return tank; }
+    if (mode === 'online') {
+      if (tank.id !== myTankId) return null;
+      return tank;
+    }
     if (tank.isAI) return null;
     return tank;
   }
@@ -55,39 +188,66 @@ window.Game = (function () {
   function resizeCanvasToState() {
     if (!canvas || !state) return;
     if (canvas.width !== state.width || canvas.height !== state.height) {
-      canvas.width = state.width; canvas.height = state.height;
+      canvas.width = state.width;
+      canvas.height = state.height;
     }
     if (window.Settings) Settings.fitCanvasDisplay(canvas);
   }
 
   function startLocal({ total = 2, humans = 1, names } = {}) {
-    stopLoopOnly(); mode = 'playing';
+    stopLoopOnly();
+    mode = 'playing';
     const humanCount = Math.max(1, Math.min(4, humans));
     const count = Math.max(humanCount, Math.min(4, total));
     const options = window.Settings ? Settings.matchOptions() : {};
     if (window.Settings && canvas) Settings.applyCanvas(canvas);
-    state = Physics.createLocalMatch({ count, humanCount, seed: Date.now() & 0xffffffff, names, options });
-    state.particles = []; resizeCanvasToState(); showGameUI(true); updateWeaponUI(); loop(); scheduleAI();
+    state = Physics.createLocalMatch({
+      count,
+      humanCount,
+      seed: Date.now() & 0xffffffff,
+      names,
+      options,
+    });
+    state.particles = [];
+    resizeCanvasToState();
+    showGameUI(true);
+    updateWeaponUI();
+    loop();
+    scheduleAI();
   }
 
   function startOnline(socket, initialState, tankId) {
-    stopLoopOnly(); mode = 'online'; onlineSocket = socket; myTankId = tankId;
-    applyServerState(initialState); resizeCanvasToState(); showGameUI(true); updateWeaponUI(); loop();
+    stopLoopOnly();
+    mode = 'online';
+    onlineSocket = socket;
+    myTankId = tankId;
+    applyServerState(initialState);
+    resizeCanvasToState();
+    showGameUI(true);
+    updateWeaponUI();
+    loop();
   }
 
   function applyServerState(s) {
     if (!s) return;
     const particles = state?.particles || [];
     const prevShake = state?.shake || 0;
-    state = { ...s, terrain: Render.hydrateTerrain(s.terrain), particles, shake: s.shake != null ? s.shake : prevShake,
-      projectiles: s.projectiles || (s.projectile ? [s.projectile] : []) };
+    state = {
+      ...s,
+      terrain: Render.hydrateTerrain(s.terrain),
+      particles,
+      shake: s.shake != null ? s.shake : prevShake,
+      projectiles: s.projectiles || (s.projectile ? [s.projectile] : []),
+    };
     if (!state.particles) state.particles = [];
     resizeCanvasToState();
   }
 
   function showGameUI(show) {
-    document.getElementById('game-overlay')?.classList.toggle('hidden', !show);
-    document.getElementById('canvas-wrap')?.classList.toggle('hidden', !show);
+    const el = document.getElementById('game-overlay');
+    if (el) el.classList.toggle('hidden', !show);
+    const canvasWrap = document.getElementById('canvas-wrap');
+    if (canvasWrap) canvasWrap.classList.toggle('hidden', !show);
   }
 
   function updateWeaponUI() {
@@ -101,10 +261,17 @@ window.Game = (function () {
     const tank = currentControllable();
     if (!tank || !state || state.phase !== 'aiming') return;
     if (mode === 'online' && onlineSocket) {
-      onlineSocket.emit('game:fire', { angle: tank.angle, power: tank.power, weapon: tank.weapon }); return;
+      onlineSocket.emit('game:fire', {
+        angle: tank.angle,
+        power: tank.power,
+        weapon: tank.weapon,
+      });
+      return;
     }
     const proj = Physics.createProjectile(tank, tank.weapon, state.bombSpeed);
-    state.projectiles = [proj]; state.projectile = proj; state.phase = 'flying';
+    state.projectiles = [proj];
+    state.projectile = proj;
+    state.phase = 'flying';
   }
 
   function scheduleAI() {
@@ -114,11 +281,14 @@ window.Game = (function () {
     if (!tank || !tank.isAI || !tank.alive) return;
     aiTimer = setTimeout(() => {
       if (!state || state.phase !== 'aiming') return;
-      Physics.aiDecide(state, tank); updateWeaponUI();
+      Physics.aiDecide(state, tank);
+      updateWeaponUI();
       setTimeout(() => {
         if (!state || state.phase !== 'aiming') return;
         const proj = Physics.createProjectile(tank, tank.weapon, state.bombSpeed);
-        state.projectiles = [proj]; state.projectile = proj; state.phase = 'flying';
+        state.projectiles = [proj];
+        state.projectile = proj;
+        state.phase = 'flying';
       }, 400);
     }, 700 + Math.random() * 600);
   }
@@ -127,22 +297,51 @@ window.Game = (function () {
     const tank = currentControllable();
     if (!tank || state.phase !== 'aiming') return;
     let changed = false;
-    const angSpeed = 1.2 * dt, powSpeed = 40 * dt;
-    if (keys['ArrowLeft'] || keys['KeyA']) { tank.angle -= angSpeed; changed = true; }
-    if (keys['ArrowRight'] || keys['KeyD']) { tank.angle += angSpeed; changed = true; }
-    if (keys['ArrowUp'] || keys['KeyW']) { tank.power = Math.min(100, tank.power + powSpeed); changed = true; }
-    if (keys['ArrowDown'] || keys['KeyS']) { tank.power = Math.max(5, tank.power - powSpeed); changed = true; }
-    const moveSpeed = 55 * dt; let moveDx = 0;
-    if (keys['KeyQ'] || keys['Comma']) moveDx -= moveSpeed;
-    if (keys['KeyE'] || keys['Period']) moveDx += moveSpeed;
+    const angSpeed = 1.2 * dt;
+    const powSpeed = 40 * dt;
+    if (keys['ArrowLeft'] || keys['KeyA'] || holds.aimLeft) {
+      tank.angle -= angSpeed;
+      changed = true;
+    }
+    if (keys['ArrowRight'] || keys['KeyD'] || holds.aimRight) {
+      tank.angle += angSpeed;
+      changed = true;
+    }
+    if (keys['ArrowUp'] || keys['KeyW'] || holds.powerUp) {
+      tank.power = Math.min(100, tank.power + powSpeed);
+      changed = true;
+    }
+    if (keys['ArrowDown'] || keys['KeyS'] || holds.powerDown) {
+      tank.power = Math.max(5, tank.power - powSpeed);
+      changed = true;
+    }
+
+    const moveSpeed = 55 * dt;
+    let moveDx = 0;
+    const moveAllowed = (state.moveDistance || 0) > 0;
+    if (moveAllowed) {
+      if (keys['KeyQ'] || keys['Comma'] || holds.moveLeft) moveDx -= moveSpeed;
+      if (keys['KeyE'] || keys['Period'] || holds.moveRight) moveDx += moveSpeed;
+    }
     if (moveDx !== 0) {
       if (mode === 'online' && onlineSocket) {
         moveAccum += moveDx;
-        if (Math.abs(moveAccum) >= 1) { const send = Math.trunc(moveAccum); moveAccum -= send; onlineSocket.emit('game:move', { dx: send }); }
-      } else if (Physics.moveTank(state, tank, moveDx)) changed = true;
+        if (Math.abs(moveAccum) >= 1) {
+          const send = Math.trunc(moveAccum);
+          moveAccum -= send;
+          onlineSocket.emit('game:move', { dx: send });
+        }
+      } else {
+        if (Physics.moveTank(state, tank, moveDx)) changed = true;
+      }
     }
+
     if (changed && mode === 'online' && onlineSocket) {
-      onlineSocket.emit('game:aim', { angle: tank.angle, power: tank.power, weapon: tank.weapon });
+      onlineSocket.emit('game:aim', {
+        angle: tank.angle,
+        power: tank.power,
+        weapon: tank.weapon,
+      });
     }
     if (changed) updateWeaponUI();
   }
@@ -154,6 +353,7 @@ window.Game = (function () {
     const now = ts || performance.now();
     const dt = Math.min(0.05, (now - (last || now)) / 1000);
     last = now;
+
     if (mode === 'playing') {
       handleAimInput(dt);
       if (state.phase === 'flying') {
@@ -161,21 +361,36 @@ window.Game = (function () {
           const { impacts, done } = Physics.stepAllProjectiles(state);
           for (const hit of impacts) {
             Physics.applyImpact(state, hit);
-            Physics.spawnParticles(state, hit.x, hit.y, hit.dirt ? '#8b6914' : hit.weapon === 'napalm' ? '#ff6622' : '#ff8844', hit.dirt ? 28 : hit.radius > 50 ? 70 : 40, hit.dirt);
+            Physics.spawnParticles(
+              state,
+              hit.x,
+              hit.y,
+              hit.dirt ? '#8b6914' : hit.weapon === 'napalm' ? '#ff6622' : '#ff8844',
+              hit.dirt ? 28 : hit.radius > 50 ? 70 : 40,
+              hit.dirt
+            );
             state.shake = hit.dirt ? 4 : Math.min(18, hit.radius / 4);
           }
-          if (done) { Physics.nextTurn(state); scheduleAI(); updateWeaponUI(); break; }
+          if (done) {
+            Physics.nextTurn(state);
+            scheduleAI();
+            updateWeaponUI();
+            break;
+          }
         }
       }
       Physics.updateParticles(state);
       if (state.shake > 0) state.shake *= 0.88;
       if (state.shake < 0.2) state.shake = 0;
     } else if (mode === 'online') {
-      handleAimInput(dt); Physics.updateParticles(state);
+      handleAimInput(dt);
+      Physics.updateParticles(state);
       if (state.shake > 0) state.shake *= 0.88;
       if (state.shake < 0.2) state.shake = 0;
     }
-    Render.frame(ctx, state, { canControl: !!currentControllable(), showHelp: mode === 'playing' || mode === 'online' });
+
+    const canControl = !!currentControllable();
+    Render.frame(ctx, state, { canControl, showHelp: mode === 'playing' || mode === 'online' });
     syncHudDom();
   }
 
@@ -186,38 +401,75 @@ window.Game = (function () {
     const moveEl = document.getElementById('hud-move');
     if (turnEl) {
       const t = state.tanks[state.currentTurn];
-      turnEl.textContent = state.phase === 'ended' ? 'Match Over' : t ? `${t.name}'s turn` : '';
+      turnEl.textContent = state.phase === 'ended'
+        ? 'Match Over'
+        : t
+          ? `${t.name}'s turn`
+          : '';
       if (t) turnEl.style.color = t.color;
     }
     if (windEl) {
-      if (state.windEnabled === false) windEl.textContent = 'Wind OFF';
-      else { const w = state.wind || 0; windEl.textContent = w === 0 ? 'Wind — 0' : w > 0 ? `Wind → ${w}` : `Wind ← ${Math.abs(w)}`; }
+      if (state.windEnabled === false) {
+        windEl.textContent = 'Wind OFF';
+      } else {
+        const w = state.wind || 0;
+        windEl.textContent = w === 0 ? 'Wind — 0' : w > 0 ? `Wind → ${w}` : `Wind ← ${Math.abs(w)}`;
+      }
     }
     if (moveEl) {
       const t = currentControllable() || state.tanks[state.currentTurn];
       const max = state.moveDistance || 0;
-      if (max <= 0) moveEl.textContent = 'Move OFF';
-      else if (t) {
+      if (max <= 0) {
+        moveEl.textContent = 'Move OFF';
+      } else if (t) {
         const origin = t.turnOriginX != null ? t.turnOriginX : t.x;
-        moveEl.textContent = `Move ${Math.max(0, Math.round(max - Math.abs(t.x - origin)))}/${max}`;
+        const used = Math.abs(t.x - origin);
+        const left = Math.max(0, Math.round(max - used));
+        moveEl.textContent = `Move ${left}/${max}`;
       }
+    }
+    const moveGroup = document.getElementById('touch-move-group');
+    if (moveGroup) {
+      const max = state.moveDistance || 0;
+      const disabled = max <= 0;
+      moveGroup.classList.toggle('disabled', disabled);
+      moveGroup.querySelectorAll('[data-hold]').forEach((btn) => {
+        btn.disabled = disabled;
+        if (disabled) {
+          setHold(btn.dataset.hold, false);
+          btn.classList.remove('held');
+        }
+      });
     }
   }
 
   function stopLoopOnly() {
-    if (raf) cancelAnimationFrame(raf); raf = null;
-    if (aiTimer) clearTimeout(aiTimer); aiTimer = null; last = 0; moveAccum = 0;
+    if (raf) cancelAnimationFrame(raf);
+    raf = null;
+    if (aiTimer) clearTimeout(aiTimer);
+    aiTimer = null;
+    last = 0;
+    moveAccum = 0;
   }
 
   function stop() {
-    stopLoopOnly(); mode = 'menu'; state = null; onlineSocket = null; myTankId = null; showGameUI(false);
+    stopLoopOnly();
+    clearHolds();
+    mode = 'menu';
+    state = null;
+    onlineSocket = null;
+    myTankId = null;
+    showGameUI(false);
   }
 
   function setWeapon(w) {
     const tank = currentControllable();
     if (!tank || !Physics.WEAPONS[w]) return;
-    tank.weapon = w; updateWeaponUI();
-    if (mode === 'online' && onlineSocket) onlineSocket.emit('game:aim', { angle: tank.angle, power: tank.power, weapon: tank.weapon });
+    tank.weapon = w;
+    updateWeaponUI();
+    if (mode === 'online' && onlineSocket) {
+      onlineSocket.emit('game:aim', { angle: tank.angle, power: tank.power, weapon: tank.weapon });
+    }
   }
 
   function onServerState(s) {
@@ -226,9 +478,15 @@ window.Game = (function () {
     const hadProj = (prev?.projectiles && prev.projectiles.length) || prev?.projectile;
     applyServerState(s);
     if (hadProj && !(s.projectiles && s.projectiles.length) && s.phase !== 'flying') {
-      const lastP = Array.isArray(hadProj) ? hadProj[0] : hadProj;
-      const trail = lastP && lastP.trail; const pt = trail && trail[trail.length - 1];
-      if (pt) { Physics.spawnParticles(state, pt.x, pt.y, '#ff8844', 45, false); state.shake = 10; }
+      const lastP = Array.isArray(hadProj)
+        ? hadProj[0]
+        : hadProj;
+      const trail = lastP && lastP.trail;
+      const pt = trail && trail[trail.length - 1];
+      if (pt) {
+        Physics.spawnParticles(state, pt.x, pt.y, '#ff8844', 45, false);
+        state.shake = 10;
+      }
     }
     updateWeaponUI();
   }
@@ -238,5 +496,18 @@ window.Game = (function () {
     if (state) state.phase = 'ended';
   }
 
-  return { init, startLocal, startOnline, stop, setWeapon, onServerState, onServerEnded, getState: () => state, getMode: () => mode };
+  return {
+    init,
+    startLocal,
+    startOnline,
+    stop,
+    fire,
+    setWeapon,
+    setHold,
+    clearHolds,
+    onServerState,
+    onServerEnded,
+    getState: () => state,
+    getMode: () => mode,
+  };
 })();
