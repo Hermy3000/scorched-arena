@@ -235,7 +235,7 @@ window.Render = (function () {
         ctx.globalAlpha = a * 0.5;
         ctx.fillStyle = col;
         ctx.beginPath();
-        ctx.arc(proj.x, proj.y, 2 + a * 2, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 2 + a * 2, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -252,8 +252,8 @@ window.Render = (function () {
   function drawParticles(ctx, particles) {
     for (const p of particles || []) {
       ctx.globalAlpha = Math.max(0, p.life / p.max);
-      ctx.fillStyle = p.color;
       ctx.beginPath();
+      ctx.fillStyle = p.color;
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
     }
